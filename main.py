@@ -1,4 +1,9 @@
 import logging
+
+import pytz
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -10,6 +15,7 @@ import os
 from dotenv import load_dotenv
 from keyboards import hour_keyboard, minutes_keyboard, type_keyboard, week_day_keyboard, month_day_keyboard
 from config import remainder_types
+from tasks import send_reminder
 
 load_dotenv()
 
@@ -21,8 +27,9 @@ API_TOKEN = os.getenv("API_TOKEN")
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
+# Словарь для хранения напоминаний
+reminders = {}
 
-# Определение состояний (FSM)
 class Remainder(StatesGroup):
     type = State()
     month_day = State()
@@ -31,13 +38,11 @@ class Remainder(StatesGroup):
     minutes = State()
     confirm = State()
 
-# Команда /start
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
     await message.answer("Введи тип напоминания:", reply_markup=type_keyboard())
     await state.set_state(Remainder.type)
 
-# Обработка типа
 @dp.message(Remainder.type)
 async def process_name(message: types.Message, state: FSMContext):
     remainder_type = remainder_types[message.text]
@@ -75,9 +80,8 @@ async def process_name(message: types.Message, state: FSMContext):
 async def process_name(message: types.Message, state: FSMContext):
     await state.update_data(hour=message.text)
     await message.answer(f"Введите минуты:", reply_markup=minutes_keyboard())
-    await state.set_state(Remainder.confirm)
+    await state.set_state(Remainder.confirm) 
 
-# # Обработка подтверждения
 @dp.message(Remainder.confirm)
 async def process_confirm(message: types.Message, state: FSMContext):
     await state.update_data(minutes=message.text)
@@ -87,47 +91,29 @@ async def process_confirm(message: types.Message, state: FSMContext):
         f"Тип: {data['type']}\n"
         f"День месяца: {data['month_day']}\n"
         f"День недели: {data['week_day']}\n"
-        f"Время: {data['hour']}:{data["minutes"]}\n",
+        f"Время: {data['hour']}:{data['minutes']}\n",
         reply_markup=ReplyKeyboardRemove(),
     )
-    print('стейт: ', data)
+    
+    user_id = message.from_user.id
+    reminders[user_id] = data
+    # hour=int(data['hour'])
+    # minute=int(data['minutes'])
+    text = "Напоминание!!!"
+    timezone = pytz.timezone("Etc/GMT-4")
+    
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(
+        send_reminder,
+        'cron',
+        hour=data['hour'],
+        minute=data['minutes'],
+        timezone=timezone,
+        args=(bot,user_id,text)
+    )
+    scheduler.start()
+
     await state.clear()
-
-
-
-# # Обработка возраста
-# @dp.message(Remainder.age)
-# async def process_age(message: types.Message, state: FSMContext):
-#     if not message.text.isdigit():
-#         await message.answer("Пожалуйста, введи число.")
-#         return
-
-#     await state.update_data(age=int(message.text))
-#     await message.answer("Теперь укажи свой пол:", reply_markup=gender_keyboard())
-#     await state.set_state(Remainder.gender)
-
-
-# # Обработка пола
-# @dp.message(Remainder.gender)
-# async def process_gender(message: types.Message, state: FSMContext):
-#     if message.text not in ["Мужской", "Женский"]:
-#         await message.answer("Пожалуйста, выбери пол из предложенных вариантов.")
-#         return
-
-#     await state.update_data(gender=message.text)
-#     data = await state.get_data()
-#     await message.answer(
-#         f"Проверь свои данные:\n"
-#         f"Имя: {data['name']}\n"
-#         f"Возраст: {data['age']}\n"
-#         f"Пол: {data['gender']}\n\n"
-#         f"Всё верно?",
-#         reply_markup=confirm_keyboard(),
-#     )
-#     await state.set_state(Remainder.confirm)
-
-
-
 
 
 async def main():
