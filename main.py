@@ -13,7 +13,8 @@ from aiogram.types import ReplyKeyboardRemove
 import asyncio
 import os
 from dotenv import load_dotenv
-from keyboards import hour_keyboard, minutes_keyboard, type_keyboard, week_day_keyboard, month_day_keyboard
+from keyboards import hour_keyboard, minutes_keyboard, type_keyboard, week_day_keyboard, month_day_keyboard, \
+    confirm_keyboard
 from config import remainder_types
 from tasks import send_reminder
 
@@ -37,6 +38,7 @@ class Remainder(StatesGroup):
     hour = State()
     minutes = State()
     confirm = State()
+    text = State()
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
@@ -80,26 +82,35 @@ async def process_name(message: types.Message, state: FSMContext):
 async def process_name(message: types.Message, state: FSMContext):
     await state.update_data(hour=message.text)
     await message.answer(f"Введите минуты:", reply_markup=minutes_keyboard())
-    await state.set_state(Remainder.confirm) 
+    await state.set_state(Remainder.minutes)
 
-@dp.message(Remainder.confirm)
-async def process_confirm(message: types.Message, state: FSMContext):
+@dp.message(Remainder.minutes)
+async def process_name(message: types.Message, state: FSMContext):
     await state.update_data(minutes=message.text)
+    await message.answer(f"Введите текст напоминания:")
+    await state.set_state(Remainder.text)
+
+@dp.message(Remainder.text)
+async def process_name(message: types.Message, state: FSMContext):
+    await state.update_data(text=message.text)
     data = await state.get_data()
     await message.answer(
-        f"Добавлено напоминание:\n"
+        f"Вы добавили напомиание:\n"
         f"Тип: {data['type']}\n"
         f"День месяца: {data['month_day']}\n"
         f"День недели: {data['week_day']}\n"
-        f"Время: {data['hour']}:{data['minutes']}\n",
-        reply_markup=ReplyKeyboardRemove(),
+        f"Время: {data['hour']}:{data['minutes']}\n"
+        f"Текст напоминания: {data['text']}",
+        reply_markup=confirm_keyboard(),
     )
-    
+    await state.set_state(Remainder.confirm)
+
+@dp.message(Remainder.confirm)
+async def process_confirm(message: types.Message, state: FSMContext):
+    data = await state.get_data()
     user_id = message.from_user.id
     reminders[user_id] = data
-    # hour=int(data['hour'])
-    # minute=int(data['minutes'])
-    text = "Напоминание!!!"
+    reminder_text = data['text']
     timezone = pytz.timezone("Etc/GMT-4")
     
     scheduler = AsyncIOScheduler()
@@ -109,10 +120,10 @@ async def process_confirm(message: types.Message, state: FSMContext):
         hour=data['hour'],
         minute=data['minutes'],
         timezone=timezone,
-        args=(bot,user_id,text)
+        args=(bot,user_id,reminder_text)
     )
     scheduler.start()
-
+    await message.answer("Уведомление добавлено", reply_markup=ReplyKeyboardRemove())
     await state.clear()
 
 

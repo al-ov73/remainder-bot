@@ -1,19 +1,20 @@
-[project]
+[tool.poetry]
 name = "remainder-bot"
 version = "0.1.0"
 description = ""
-authors = [
-    {name = "al-ov73",email = "klever1987@yandex.ru"}
-]
+authors = ["al-ov73"]
 readme = "README.md"
-requires-python = ">=3.12"
-dependencies = [
-    "python-dotenv (>=1.0.1,<2.0.0)",
-    "aiogram (>=3.17.0,<4.0.0)",
-    "apscheduler (>=3.11.0,<4.0.0)",
-    "pytz (>=2025.1,<2026.0)",
-]
+packages = [{ include = "remainder_bot", from = "src" }]
+include = ["src/**/__init__.py"]
 
+[tool.poetry.dependencies]
+python = "^3.12"
+python-dotenv = "^1.0.1"
+aiogram = "^3.17.0"
+apscheduler = "^3.11.0"
+pytz = "^2025.1"
+
+[tool.poetry.dev-dependencies]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
