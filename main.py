@@ -1,34 +1,29 @@
 import logging
+import asyncio
 
-import pytz
+
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardRemove
 
-import asyncio
-import os
-from dotenv import load_dotenv
 from keyboards import hour_keyboard, minutes_keyboard, type_keyboard, week_day_keyboard, month_day_keyboard, \
     confirm_keyboard
-from config import remainder_types
+from commands import bot_commands
+from config import API_TOKEN, remainder_types, db, timezone
 from tasks import send_reminder
 
-load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-API_TOKEN = os.getenv("API_TOKEN")
-
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
+scheduler = AsyncIOScheduler()
 
-# Словарь для хранения напоминаний
 reminders = {}
 
 class Remainder(StatesGroup):
@@ -87,7 +82,7 @@ async def process_name(message: types.Message, state: FSMContext):
 @dp.message(Remainder.minutes)
 async def process_name(message: types.Message, state: FSMContext):
     await state.update_data(minutes=message.text)
-    await message.answer(f"Введите текст напоминания:")
+    await message.answer(f"Введите текст напоминания:", reply_markup=ReplyKeyboardRemove())
     await state.set_state(Remainder.text)
 
 @dp.message(Remainder.text)
@@ -107,27 +102,49 @@ async def process_name(message: types.Message, state: FSMContext):
 
 @dp.message(Remainder.confirm)
 async def process_confirm(message: types.Message, state: FSMContext):
-    data = await state.get_data()
     user_id = message.from_user.id
+    data = await state.get_data()
+    data["user_id"] = user_id
+    print(data)
+    db.insert(data)
     reminders[user_id] = data
     reminder_text = data['text']
-    timezone = pytz.timezone("Etc/GMT-4")
-    
-    scheduler = AsyncIOScheduler()
     scheduler.add_job(
         send_reminder,
         'cron',
+        day=data['month_day'], # day of month (1-31)
+        day_of_week=['week_day'], # number or name of weekday (0-6 or mon,tue,wed,thu,fri,sat,sun)
         hour=data['hour'],
         minute=data['minutes'],
-        timezone=timezone,
+        timezone=timezone, # timezone (datetime.tzinfo|str) – time zone to use for the date/time calculations (defaults to scheduler timezone)
         args=(bot,user_id,reminder_text)
     )
     scheduler.start()
     await message.answer("Уведомление добавлено", reply_markup=ReplyKeyboardRemove())
     await state.clear()
 
+@dp.message(Command("reminders"))
+async def cmd_start(message: types.Message, state: FSMContext):
+    scheduler.print_jobs()
+    reminders = [f"{r}" for r in db.all()]
+    formated_reminders = "\n\n".join(reminders)
+    await message.answer(f"текущие напоминания:\n\n{formated_reminders}")
+
+def add_tasks_from_db():
+    jobs = db.all()
+    for job in jobs:
+        scheduler.add_job(
+            send_reminder,
+            'cron',
+            hour=job['hour'],
+            minute=job['minutes'],
+            timezone=timezone,
+            args=(bot,job['user_id'],job['text'])
+        )
 
 async def main():
+    add_tasks_from_db()
+    await bot.set_my_commands(bot_commands)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
