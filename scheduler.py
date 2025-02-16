@@ -1,9 +1,7 @@
-from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from config import API_TOKEN, remainder_types, db, timezone
+from config import API_TOKEN, remainder_types, db, timezone, scheduler
+from aiogram import Bot
 
-
-scheduler = AsyncIOScheduler()
+from tasks import send_reminder
 
 week_days = {
     "ПН": 0,
@@ -15,29 +13,28 @@ week_days = {
     "ВС": 6,
 }
 
-def add_task(data: dict) -> None:
+def add_task(data: dict, bot: Bot) -> None:
     match data['type']:
         case 'dayly':
-            add_daily_task(data)
+            add_daily_task(data, bot)
         case 'weekly':
-            add_weekly_task(data)
+            add_weekly_task(data, bot)
         case 'monthly':
-            add_monthly_task(data)
+            add_monthly_task(data, bot)
         case _:
             pass
 
-def add_daily_task(data: dict):
+def add_daily_task(data: dict, bot: Bot):
     scheduler.add_job(
         send_reminder,
         'cron',
         hour=data['hour'],
         minute=data['minutes'],
         timezone=timezone,
-        args=(bot,user_id,reminder_text)
+        args=(bot,data["user_id"],data['text'])
     )
-    scheduler.start()
 
-def add_weekly_task(data: dict):
+def add_weekly_task(data: dict, bot: Bot):
     scheduler.add_job(
         send_reminder,
         'cron',
@@ -45,11 +42,11 @@ def add_weekly_task(data: dict):
         hour=data['hour'],
         minute=data['minutes'],
         timezone=timezone,
-        args=(bot,user_id,reminder_text)
+        args=(bot,data["user_id"],data['text'])
     )
-    scheduler.start()
 
-def add_monthly_task(data: dict):
+
+def add_monthly_task(data: dict, bot: Bot):
     scheduler.add_job(
         send_reminder,
         'cron',
@@ -57,11 +54,10 @@ def add_monthly_task(data: dict):
         hour=data['hour'],
         minute=data['minutes'],
         timezone=timezone,
-        args=(bot,user_id,reminder_text)
+        args=(bot,data["user_id"],data['text'])
     )
-    scheduler.start()
 
-def add_tasks_from_db():
+def add_tasks_from_db(bot: Bot):
     jobs = db.all()
     for job in jobs:
         scheduler.add_job(

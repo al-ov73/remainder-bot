@@ -10,9 +10,8 @@ from aiogram.types import ReplyKeyboardRemove
 from keyboards import hour_keyboard, minutes_keyboard, type_keyboard, week_day_keyboard, month_day_keyboard, \
     confirm_keyboard
 from commands import bot_commands
-from config import API_TOKEN, remainder_types, db, timezone
-from tasks import send_reminder
-
+from config import API_TOKEN, remainder_types, db, timezone, scheduler
+from scheduler import add_tasks_from_db, add_task
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -103,22 +102,19 @@ async def process_confirm(message: types.Message, state: FSMContext):
     data["user_id"] = user_id
     print(data)
     db.insert(data)
-    reminder_text = data['text']
-    input_week_day = data.get('week_day')
-    day_of_week = week_days[input_week_day] if input_week_day else ""
-
+    add_task(data, bot)
     await message.answer("Уведомление добавлено", reply_markup=ReplyKeyboardRemove())
     await state.clear()
 
 @dp.message(Command("reminders"))
 async def cmd_start(message: types.Message, state: FSMContext):
-    scheduler.print_jobs()
     reminders = [f"{r}" for r in db.all()]
     formated_reminders = "\n\n".join(reminders)
     await message.answer(f"текущие напоминания:\n\n{formated_reminders}")
 
 async def main():
-    add_tasks_from_db()
+    add_tasks_from_db(bot)
+    scheduler.start()
     await bot.set_my_commands(bot_commands)
     await dp.start_polling(bot)
 
