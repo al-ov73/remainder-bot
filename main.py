@@ -1,9 +1,6 @@
 import logging
 import asyncio
 
-
-from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -22,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
-scheduler = AsyncIOScheduler()
 
 reminders = {}
 
@@ -107,19 +103,10 @@ async def process_confirm(message: types.Message, state: FSMContext):
     data["user_id"] = user_id
     print(data)
     db.insert(data)
-    reminders[user_id] = data
     reminder_text = data['text']
-    scheduler.add_job(
-        send_reminder,
-        'cron',
-        day=data['month_day'], # day of month (1-31)
-        day_of_week=['week_day'], # number or name of weekday (0-6 or mon,tue,wed,thu,fri,sat,sun)
-        hour=data['hour'],
-        minute=data['minutes'],
-        timezone=timezone, # timezone (datetime.tzinfo|str) – time zone to use for the date/time calculations (defaults to scheduler timezone)
-        args=(bot,user_id,reminder_text)
-    )
-    scheduler.start()
+    input_week_day = data.get('week_day')
+    day_of_week = week_days[input_week_day] if input_week_day else ""
+
     await message.answer("Уведомление добавлено", reply_markup=ReplyKeyboardRemove())
     await state.clear()
 
@@ -129,18 +116,6 @@ async def cmd_start(message: types.Message, state: FSMContext):
     reminders = [f"{r}" for r in db.all()]
     formated_reminders = "\n\n".join(reminders)
     await message.answer(f"текущие напоминания:\n\n{formated_reminders}")
-
-def add_tasks_from_db():
-    jobs = db.all()
-    for job in jobs:
-        scheduler.add_job(
-            send_reminder,
-            'cron',
-            hour=job['hour'],
-            minute=job['minutes'],
-            timezone=timezone,
-            args=(bot,job['user_id'],job['text'])
-        )
 
 async def main():
     add_tasks_from_db()
