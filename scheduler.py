@@ -31,7 +31,7 @@ def add_daily_task(data: dict, bot: Bot):
         hour=data['hour'],
         minute=data['minutes'],
         timezone=timezone,
-        args=(bot,data["user_id"],data['text'])
+        args=(bot,data)
     )
 
 def add_weekly_task(data: dict, bot: Bot):
@@ -42,7 +42,7 @@ def add_weekly_task(data: dict, bot: Bot):
         hour=data['hour'],
         minute=data['minutes'],
         timezone=timezone,
-        args=(bot,data["user_id"],data['text'])
+        args=(bot,data)
     )
 
 
@@ -54,17 +54,25 @@ def add_monthly_task(data: dict, bot: Bot):
         hour=data['hour'],
         minute=data['minutes'],
         timezone=timezone,
-        args=(bot,data["user_id"],data['text'])
+        args=(bot,data)
     )
 
 def add_tasks_from_db(bot: Bot):
     jobs = db.all()
     for job in jobs:
-        scheduler.add_job(
-            send_reminder,
-            'cron',
-            hour=job['hour'],
-            minute=job['minutes'],
-            timezone=timezone,
-            args=(bot,job['user_id'],job['text'])
-        )
+        add_task(job, bot)
+
+def get_formatted_jobs() -> str:
+    scheduled = []
+    for j in scheduler.get_jobs():
+        data = j.args[1]
+        match data["type"]:
+            case 'dayly':
+                scheduled.append(f"Тип: {data["type"]}\nвремя: {data["hour"]}:{data["minutes"]}\nтекст: {data["text"]}\nслед. напоминание: {j.next_run_time}")
+            case 'weekly':
+                scheduled.append(f"Тип: {data["type"]}\nдень недели: {data["week_day"]}\nвремя: {data["hour"]}:{data["minutes"]}\nтекст: {data["text"]}\nслед. напоминание: {j.next_run_time}")
+            case 'monthly':
+                scheduled.append(f"Тип: {data["type"]}\nчисло: {data["month_day"]}\nвремя: {data["hour"]}:{data["minutes"]}\nтекст: {data["text"]}\nслед. напоминание: {j.next_run_time}")
+            case _:
+                pass
+    return "\n\n".join(scheduled)

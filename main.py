@@ -11,7 +11,7 @@ from keyboards import hour_keyboard, minutes_keyboard, type_keyboard, week_day_k
     confirm_keyboard
 from commands import bot_commands
 from config import API_TOKEN, remainder_types, db, timezone, scheduler
-from scheduler import add_tasks_from_db, add_task
+from scheduler import add_tasks_from_db, add_task, get_formatted_jobs
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -110,6 +110,8 @@ async def process_confirm(message: types.Message, state: FSMContext):
 async def cmd_start(message: types.Message, state: FSMContext):
     reminders = [f"{r}" for r in db.all()]
     formated_reminders = "\n\n".join(reminders)
+    print(formated_reminders)
+    formated_reminders = get_formatted_jobs()
     await message.answer(f"текущие напоминания:\n\n{formated_reminders}")
 
 async def main():
