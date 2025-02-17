@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import ReplyKeyboardRemove
-from aiogram.utils.keyboard import ReplyKeyboardBuilder
+from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 from aiogram.enums import ParseMode
 from config import remainder_types
 
@@ -13,6 +13,14 @@ def confirm_keyboard():
     builder = ReplyKeyboardBuilder()
     builder.button(text="Да")
     builder.button(text="Нет")
+    builder.adjust(2)
+    return builder.as_markup(resize_keyboard=True)
+
+def delete_task_keyboard(tasks):
+    builder = InlineKeyboardBuilder()
+
+    for t in tasks:
+        builder.button(text=f"{t["type"]}{t["hour"]}:{t["minutes"]}", callback_data=f"task_{t['task_id']}")
     builder.adjust(2)
     return builder.as_markup(resize_keyboard=True)
 

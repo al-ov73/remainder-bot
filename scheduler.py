@@ -1,5 +1,6 @@
 from config import API_TOKEN, remainder_types, db, timezone, scheduler
 from aiogram import Bot
+from tinydb import Query
 
 from tasks import send_reminder
 
@@ -13,19 +14,20 @@ week_days = {
     "ВС": 6,
 }
 
-def add_task(data: dict, bot: Bot) -> None:
+def add_task(data: dict, bot: Bot) -> str:
     match data['type']:
         case 'dayly':
-            add_daily_task(data, bot)
+            job = add_daily_task(data, bot)
         case 'weekly':
-            add_weekly_task(data, bot)
+            job = add_weekly_task(data, bot)
         case 'monthly':
-            add_monthly_task(data, bot)
+            job = add_monthly_task(data, bot)
         case _:
             pass
+    return job.id
 
 def add_daily_task(data: dict, bot: Bot):
-    scheduler.add_job(
+    return scheduler.add_job(
         send_reminder,
         'cron',
         hour=data['hour'],
@@ -35,7 +37,7 @@ def add_daily_task(data: dict, bot: Bot):
     )
 
 def add_weekly_task(data: dict, bot: Bot):
-    scheduler.add_job(
+    return scheduler.add_job(
         send_reminder,
         'cron',
         day_of_week=week_days.get(data['week_day']),
@@ -47,7 +49,7 @@ def add_weekly_task(data: dict, bot: Bot):
 
 
 def add_monthly_task(data: dict, bot: Bot):
-    scheduler.add_job(
+    return scheduler.add_job(
         send_reminder,
         'cron',
         day=data['month_day'],
@@ -60,8 +62,20 @@ def add_monthly_task(data: dict, bot: Bot):
 def add_tasks_from_db(bot: Bot):
     jobs = db.all()
     for job in jobs:
-        add_task(job, bot)
+        old_task_id = job["task_id"]
+        new_task_id = add_task(job, bot)
+        Task = Query()
+        db.update({'task_id': new_task_id}, Task.task_id == old_task_id)
 
+def rm_all_tasks_from_db():
+    for j in scheduler.get_jobs():
+        j.remove()
+
+def delete_task(task_id: str) -> None:
+    scheduler.remove_job(task_id)
+    Task = Query()
+    db.remove(Task.task_id == task_id)
+    
 def get_formatted_jobs() -> str:
     scheduled = []
     for j in scheduler.get_jobs():

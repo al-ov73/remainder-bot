@@ -7,11 +7,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardRemove
 
-from keyboards import hour_keyboard, minutes_keyboard, type_keyboard, week_day_keyboard, month_day_keyboard, \
+from keyboards import delete_task_keyboard, hour_keyboard, minutes_keyboard, type_keyboard, week_day_keyboard, month_day_keyboard, \
     confirm_keyboard
 from commands import bot_commands
 from config import API_TOKEN, remainder_types, db, timezone, scheduler
-from scheduler import add_tasks_from_db, add_task, get_formatted_jobs
+from scheduler import add_tasks_from_db, add_task, delete_task, get_formatted_jobs, rm_all_tasks_from_db
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -100,19 +100,34 @@ async def process_confirm(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     data = await state.get_data()
     data["user_id"] = user_id
-    print(data)
+    data["task_id"] = add_task(data, bot)
     db.insert(data)
-    add_task(data, bot)
     await message.answer("Уведомление добавлено", reply_markup=ReplyKeyboardRemove())
     await state.clear()
 
 @dp.message(Command("reminders"))
 async def cmd_start(message: types.Message, state: FSMContext):
-    reminders = [f"{r}" for r in db.all()]
-    formated_reminders = "\n\n".join(reminders)
-    print(formated_reminders)
+    for job in db.all():
+        print(job)
     formated_reminders = get_formatted_jobs()
     await message.answer(f"текущие напоминания:\n\n{formated_reminders}")
+
+@dp.message(Command("purge"))
+async def cmd_start(message: types.Message, state: FSMContext):
+    db.truncate()
+    rm_all_tasks_from_db()
+    await message.answer(f"Все напоминания удалены")
+    
+@dp.message(Command("delete"))
+async def cmd_start(message: types.Message, state: FSMContext):
+    await message.answer(f"Какое напоминание удалить?", reply_markup=delete_task_keyboard(db.all()))
+    
+    
+@dp.callback_query(lambda c: c.data.startswith("task_"))
+async def handle_task_selection(callback: types.CallbackQuery):
+    task_id = callback.data.split("_")[1]
+    delete_task(task_id)
+    await bot.send_message(callback.from_user.id, f"Напоминание {task_id} удалено")
 
 async def main():
     add_tasks_from_db(bot)
