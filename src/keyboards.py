@@ -1,27 +1,25 @@
-import logging
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import ReplyKeyboardRemove
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
-from aiogram.enums import ParseMode
-from config import remainder_types
 
-def confirm_keyboard():
-    builder = ReplyKeyboardBuilder()
-    builder.button(text="Да")
-    builder.button(text="Нет")
+from models import Remainder
+from src.config import remainder_types, scheduler
+
+
+def confirm_keyboard(prefix: str, task_id: str):
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Да", callback_data=f"{prefix}__Да__{task_id}")
+    builder.button(text="Нет", callback_data=f"{prefix}__Нет")
     builder.adjust(2)
     return builder.as_markup(resize_keyboard=True)
 
-def delete_task_keyboard(tasks):
+def delete_task_keyboard():
     builder = InlineKeyboardBuilder()
 
-    for t in tasks:
-        builder.button(text=f"{t["type"]}{t["hour"]}:{t["minutes"]}", callback_data=f"task_{t['task_id']}")
-    builder.adjust(2)
+    for j in scheduler.get_jobs():
+        data = j.args[1]
+        remainder = Remainder(**data)
+        builder.button(text=str(remainder), callback_data=f"task__{remainder.task_id}")
+    builder.button(text="Отменить", callback_data=f"task__")
+    builder.adjust(1)
     return builder.as_markup(resize_keyboard=True)
 
 def type_keyboard():
@@ -41,7 +39,7 @@ def week_day_keyboard():
 
 def hour_keyboard():
     builder = ReplyKeyboardBuilder()
-    for hour in range(1, 25):
+    for hour in range(0, 24):
         builder.button(text=str(hour))
     builder.adjust(6)
     return builder.as_markup(resize_keyboard=True)
@@ -55,7 +53,7 @@ def month_day_keyboard():
 
 def minutes_keyboard():
     builder = ReplyKeyboardBuilder()
-    for minute in range(0, 60, 15):
-        builder.button(text=str(minute))
+    for minute in ["00", "15", "30", "45"]:
+        builder.button(text=minute)
     builder.adjust(4)
     return builder.as_markup(resize_keyboard=True)

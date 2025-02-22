@@ -1,8 +1,10 @@
-from config import API_TOKEN, remainder_types, db, timezone, scheduler
+
 from aiogram import Bot
 from tinydb import Query
 
-from tasks import send_reminder
+from models import Remainder
+from src.config import scheduler, timezone, db
+from src.tasks import send_reminder
 
 week_days = {
     "ПН": 0,
@@ -72,21 +74,24 @@ def rm_all_tasks_from_db():
         j.remove()
 
 def delete_task(task_id: str) -> None:
-    scheduler.remove_job(task_id)
-    Task = Query()
-    db.remove(Task.task_id == task_id)
-    
+    for j in scheduler.get_jobs():
+        data = j.args[1]
+        if data["task_id"] == task_id:
+            scheduler.remove_job(j.id)
+            Task = Query()
+            db.remove(Task.task_id == task_id)
+
+def get_formatted_task(task_id: str) -> str | None:
+    for j in scheduler.get_jobs():
+        data = j.args[1]
+        if data["task_id"] == task_id:
+            return str(Remainder(**data))
+    return None
+
 def get_formatted_jobs() -> str:
     scheduled = []
     for j in scheduler.get_jobs():
         data = j.args[1]
-        match data["type"]:
-            case 'dayly':
-                scheduled.append(f"Тип: {data["type"]}\nвремя: {data["hour"]}:{data["minutes"]}\nтекст: {data["text"]}\nслед. напоминание: {j.next_run_time}")
-            case 'weekly':
-                scheduled.append(f"Тип: {data["type"]}\nдень недели: {data["week_day"]}\nвремя: {data["hour"]}:{data["minutes"]}\nтекст: {data["text"]}\nслед. напоминание: {j.next_run_time}")
-            case 'monthly':
-                scheduled.append(f"Тип: {data["type"]}\nчисло: {data["month_day"]}\nвремя: {data["hour"]}:{data["minutes"]}\nтекст: {data["text"]}\nслед. напоминание: {j.next_run_time}")
-            case _:
-                pass
-    return "\n\n".join(scheduled)
+        scheduled.append(str(Remainder(**data)))
+
+    return "\n".join(scheduled)
