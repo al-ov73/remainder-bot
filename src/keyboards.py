@@ -4,7 +4,7 @@ from models import Remainder
 from src.config import remainder_types, scheduler
 
 
-def confirm_keyboard(prefix: str, task_id: str):
+def confirm_keyboard(prefix: str, task_id: str = None):
     builder = InlineKeyboardBuilder()
     builder.button(text="Да", callback_data=f"{prefix}__Да__{task_id}")
     builder.button(text="Нет", callback_data=f"{prefix}__Нет")

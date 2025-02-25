@@ -15,7 +15,7 @@ class TelegramCommand:
 
 
 class TelegramCommands(Enum):
-    START = TelegramCommand("start", "Старт")
+    START = TelegramCommand("add_reminder", "Добавить")
     REMINDERS = TelegramCommand("reminders", "Напоминания")
     DELETE = TelegramCommand("delete", "Удалить напоминание")
     PURGE = TelegramCommand("purge", "Удалить все")
